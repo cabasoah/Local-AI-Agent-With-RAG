@@ -2,3 +2,18 @@ langchain
 langchain-ollama
 langchain-chroma
 pandas
+
+
+
+For a bit of context, I used  chroma db to store vector embeddings in this project instead of pgvector because of it
+simplicity, minimal setup, and best fitted for small dataset as this project.
+
+I built a two-part pipeline. The first script (vector.py) handles the ETL process: load structured CSV dataset of reviews into
+a pandas dataframe, chunked them into a langchain document objects, and embedded them using Ollama's mxbai-embed-large model.
+I stored those embeddings in a local Chroma vector database.
+
+The second script act as the frontend that takes the user query, retrieves the top 5 most semantically relevant reviews using Cosine Similarity,
+and injects them into a context-aware prompt for Llama 3.2 to generate a grounded response.
+
+It was a great way to master the RAG architecture while keeping all data completely local
+

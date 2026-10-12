@@ -1,0 +1,4 @@
+{"id": "q01", "type": "lookup", "question": "Did anyone complain about waiting a long time for a table?", "relevant_row_ids": [1,53]}
+{"id": "q02", "type": "multi", "question": "Which reviews praise the crust?", "relevant_row_ids": [0,3,4,11,26,33,34,36,40,43,46,54,68,72,80,106]}
+{"id": "q03", "type": "unanswerable", "question": "Do they offer catering for weddings?", "relevant_row_ids": []}
+{"id": "q04", "type": "aggregate", "question": "How many reviews give 1 star?", "evidence_row_ids": [12,31,99,111,113,121], "expected": 6}
