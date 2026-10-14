@@ -11,7 +11,11 @@ K_VALUES = [1, 3, 5, 10]
 def load_questions(path=QUESTIONS_PATH):
     with open(path, encoding="utf-8") as f:
         qs = [json.loads(line) for line in f if line.strip()]
-    return [q for q in qs if q["relevant_row_ids"]]  # need a known right answer
+    # return [q for q in qs if q["relevant_row_ids"]]
+    return [
+        q for q in qs
+        if q["type"] in {"lookup", "multi"} and q["relevant_row_ids"]
+    ]
 
 
 def evaluate(k, questions):

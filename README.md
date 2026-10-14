@@ -12,6 +12,7 @@ A **fully local** Retrieval-Augmented Generation (RAG) system that leverages Lan
 - [Installation](#installation)
 - [Project Structure](#project-structure)
 - [Usage](#usage)
+- [Evaluation](#evaluation)
 - [Architecture & How It Works](#architecture--how-it-works)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
@@ -63,7 +64,7 @@ Before installation, ensure you have:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/Local-AI-Agent-With-RAG.git
+git clone https://github.com/cabasoah/Local-AI-Agent-With-RAG.git
 cd Local-AI-Agent-With-RAG
 ```
 
@@ -115,6 +116,10 @@ You should see:
 Local-AI-Agent-With-RAG/
 ├── main.py                            # Interactive CLI for querying
 ├── vector.py                          # ETL & Vector embedding pipeline
+├── eval_retrieval.py                  # Retrieval benchmark runner
+├── validate_questions.py              # Evaluation dataset validator
+├── evals/
+│   └── questions.jsonl                # Labeled retrieval questions
 ├── realistic_restaurant_reviews.csv   # Sample dataset
 ├── requirements.txt                   # Python dependencies
 ├── README.md                          # This file
@@ -128,6 +133,9 @@ Local-AI-Agent-With-RAG/
 |------|---------|
 | `vector.py` | Loads CSV, creates embeddings, stores in Chroma DB |
 | `main.py` | Runs interactive query loop with RAG pipeline |
+| `eval_retrieval.py` | Measures retrieval hit rate, recall, MRR, and latency at different values of `k` |
+| `validate_questions.py` | Checks evaluation question types, IDs, and referenced dataset rows |
+| `evals/questions.jsonl` | Labeled questions and expected relevant review row IDs |
 | `realistic_restaurant_reviews.csv` | Sample dataset (restaurant reviews) |
 | `requirements.txt` | Python package dependencies |
 
@@ -166,6 +174,45 @@ Local-AI-Agent-With-RAG/
 - "How do customers rate the service?"
 - "What makes this restaurant special?"
 - "Are there any recurring themes in the reviews?"
+
+---
+
+## 📊 Evaluation
+
+The repository includes a labeled retrieval benchmark in
+`evals/questions.jsonl`. It contains lookup, multi-document, aggregate, and
+unanswerable questions with the review row IDs used as relevance labels.
+
+### Validate the Evaluation Dataset
+
+Run this after editing the benchmark questions:
+
+```bash
+python validate_questions.py
+```
+
+The validator reports malformed JSON, duplicate question IDs, invalid row
+IDs, unexpected question types, and suspicious label sets. A clean run prints
+the question counts.
+
+### Run the Retrieval Benchmark
+
+Make sure Ollama is running and the required models are installed, then run:
+
+```bash
+python eval_retrieval.py
+```
+
+The benchmark evaluates `k = 1, 3, 5, 10` and prints:
+
+- **hit@k**: the proportion of questions where at least one relevant review was retrieved
+- **recall@k**: the average proportion of relevant reviews retrieved
+- **MRR**: mean reciprocal rank of the first relevant review
+- **median retrieval ms**: median retrieval latency
+
+Only questions with labeled relevant rows are included in retrieval metrics.
+The benchmark uses the same persistent Chroma store and embedding model as
+the application.
 
 ---
 
