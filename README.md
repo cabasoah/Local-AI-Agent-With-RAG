@@ -1,4 +1,4 @@
-# Local AI Agent with RAG
+# Local Q&A System with RAG
 
 A **fully local** Retrieval-Augmented Generation (RAG) system that leverages LangChain, Ollama, and Chroma to intelligently query and analyze structured datasets without external API dependencies. Built for analyzing restaurant reviews using semantic search and context-aware AI responses.
 
