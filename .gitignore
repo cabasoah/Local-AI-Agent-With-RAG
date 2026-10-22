@@ -2,3 +2,5 @@ venv/
 __pycache__/
 chrome_langchain_db/
 reviews_for_labeling.txt
+data/
+chroma_db/
