@@ -1,6 +1,20 @@
-venv/
+# Python
 __pycache__/
-chrome_langchain_db/
-reviews_for_labeling.txt
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Data and indexes: large, and rebuilt by `python -m rag.ingest` + `python -m rag.build_index`
 data/
 chroma_db/
+chrome_langchain_db/
+
+# Eval outputs: keep the small summaries, ignore per-query dumps and caches
+evals/results/*
+!evals/results/*.summary.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

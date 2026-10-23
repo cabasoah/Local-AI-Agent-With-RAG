@@ -28,6 +28,8 @@ def get_vector_store() -> Chroma:
         collection_name=COLLECTION,
         persist_directory=str(DB_DIR),
         embedding_function=OllamaEmbeddings(model=EMBED_MODEL),
+        # Chroma defaults to L2 distance. Set cosine explicitly so the
+        # README can truthfully say "cosine similarity".
         collection_metadata={"hnsw:space": "cosine"},
     )
 

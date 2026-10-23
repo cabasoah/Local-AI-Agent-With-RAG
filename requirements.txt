@@ -1,6 +1,7 @@
-langchain
+langchain-core
 langchain-ollama
 langchain-chroma
-pandas
 langchain-text-splitters
-
+rank-bm25
+sentence-transformers  # only for evals/eval_rerank.py
+pytest

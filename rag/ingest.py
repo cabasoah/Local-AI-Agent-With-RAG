@@ -7,9 +7,10 @@ Input:
 
 Output:
     data/processed/chunks.jsonl        one line per chunk, with character offsets
-    evals/legalbench_mini.jsonl        the 776 queries we evaluate against
+    data/processed/legalbench_mini.jsonl  the queries we evaluate against
 
-No embeddings happen here.
+No embeddings happen here. That's build_index.py, so changing the chunk
+settings and re-running this script takes seconds, not an hour.
 """
 
 import argparse
@@ -25,21 +26,24 @@ DATA_DIR = Path("data")
 CORPUS_DIR = DATA_DIR / "corpus"
 BENCHMARK_DIR = DATA_DIR / "benchmarks"
 CHUNKS_OUT = DATA_DIR / "processed" / "chunks.jsonl"
-QUERIES_OUT = Path("evals") / "legalbench_mini.jsonl"
+QUERIES_OUT = DATA_DIR / "processed" / "legalbench_mini.jsonl"
 
 DATASETS = ["privacy_qa", "contractnli", "maud", "cuad"]
 MAX_QUERIES_PER_DATASET = 194  # 4 x 194 = 776, the paper's "mini" set
 
 
 # ---------------------------------------------------------------------------
-# 1. Pick the mini set of queries
+# 1. Pick the mini set of queries (same logic as the official repo)
 # ---------------------------------------------------------------------------
 def select_mini_queries(dataset: str) -> list[dict]:
     with open(BENCHMARK_DIR / f"{dataset}.json", encoding="utf-8") as f:
         tests = json.load(f)["tests"]
 
     if len(tests) > MAX_QUERIES_PER_DATASET:
-    
+        # Each query gets a pseudo-random number seeded by its document's path.
+        # Queries about the same document get the same number, so they sort
+        # next to each other -> the 194 we keep cover as few documents as
+        # possible. This matches benchmark.py in zeroentropy-cc/legalbenchrag.
         def doc_seeded_key(test: dict) -> float:
             random.seed(test["snippets"][0]["file_path"])
             return random.random()
