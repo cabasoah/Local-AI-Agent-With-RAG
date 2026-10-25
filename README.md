@@ -69,3 +69,7 @@ python main.py                # ask questions
 python -m pytest tests -q     # tests
 python -m evals.eval_hybrid   # reproduce the main results rows
 ```
+
+## How this was built
+
+Developed with AI assistance. Claude (Anthropic) wrote and reviewed much of the code. I directed the project, ran and checked every experiment, graded the 40 answers by hand, and decided what to adopt or reject based on the results. An independent AI code review found the line-ending and nDCG bugs, which were fixed with regression tests.
