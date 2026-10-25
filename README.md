@@ -2,7 +2,7 @@
 
 Ask questions about a legal contract and get answers that cite the exact passages they came from. Runs fully locally (Ollama + Chroma). Every change is measured on [LegalBench-RAG](https://github.com/zeroentropy-cc/legalbenchrag), a benchmark of expert-labelled questions over real contracts and privacy policies.
 
-> Status: work in progress. Retrieval is final; the next steps are fixing answer over-refusal, then an API and deployment.
+> Status: retrieval and answer generation are evaluated; an API and a live demo are next.
 
 ## Results
 
@@ -16,7 +16,21 @@ Ask questions about a legal contract and get answers that cite the exact passage
 | **+ hybrid search (BM25 + dense, RRF): current system** | **0.464** | **0.771** | **0.594** | **0.600** | **111 ms** |
 | + cross-encoder rerank (MiniLM, pool 20): not adopted | 0.467 | 0.781 | 0.596 | 0.610 | 902 ms |
 
-**Answers** (Llama 3.2 3B, 40 questions, graded by hand against the expert answers): 14 correct, 1 partly right. In 18 of the 26 failures the answer was among the retrieved passages, so generation is now the bottleneck: the model said NOT FOUND 21 times, 14 of them with the answer in front of it.
+**Answers** (Llama 3.2 3B, top 5 hybrid chunks, 40 test questions graded by hand against the expert answers; an independent second grading disagreed on 17 rows, all re-checked against the expert text):
+
+| Prompt | Correct | Partly | Wrong | Correct rate |
+| --- | --- | --- | --- | --- |
+| v1: quote or say NOT FOUND | 14 | 1 | 25 | 0.35* |
+| **v2: allows Yes/No answers (current)** | **21** | **9** | **10** | **0.53** |
+
+\*v1 was graded before the second-grading audit was introduced, so the two rates are not measured identically.
+
+- v1 refused too often: 21 NOT FOUNDs, 14 of them with the answer in its passages.
+- v2 was tuned on a separate 40-question development set (no overlap with the test questions): false refusals 12 → 0. The trade-off: it now answers even when retrieval missed the evidence (only 7 of 20 newly answered development questions cite the expert passage).
+- A stricter refusal rule (v3) changed no refusals at all, which suggests a 3B model can't judge whether a passage answers the question through prompting alone. Kept in the code as a documented, rejected experiment.
+- Of v2's 19 imperfect answers, 14 had the answer in their passages (mostly incomplete rather than wrong) and 5 were retrieval misses.
+
+Future work: a larger model (e.g. llama3.1:8b), or deciding NOT FOUND outside the model from retrieval relevance scores.
 
 **Reading the numbers honestly**
 

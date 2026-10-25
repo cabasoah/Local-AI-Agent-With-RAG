@@ -28,3 +28,19 @@ def test_not_found_detection():
     assert parse_answer("Not found.", CHUNKS)["not_found"]
     # Cites passages, so it's an answer even though it says "not found".
     assert not parse_answer("The term is not found in [C1], but [C2] says X.", CHUNKS)["not_found"]
+
+
+def test_v2_prompt_allows_yes_no_and_keeps_not_found_narrow():
+    p = build_prompt("Does the contract allow X?", CHUNKS, "v2")
+    assert '"Yes" or "No"' in p and "NOT FOUND only if none of the passages" in p
+    assert "[C1]\npassage 0 text" in p
+
+
+def test_v1_prompt_is_unchanged():
+    assert "If the passages do not contain the answer, reply with exactly: NOT FOUND" in build_prompt("q", CHUNKS, "v1")
+
+
+def test_labels_only_answers_are_flagged():
+    assert parse_answer("[C1][C3].", CHUNKS)["labels_only"]
+    assert not parse_answer("Yes, it may [C1].", CHUNKS)["labels_only"]
+    assert not parse_answer("NOT FOUND", CHUNKS)["labels_only"]
