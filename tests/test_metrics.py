@@ -62,3 +62,12 @@ def test_span_recall_with_two_gold_spans():
     golds = GOLD + [{"file_path": "a.txt", "span": [9000, 9100]}]
     s = score_query([chunk("a.txt", 0, 1500)], golds, n_relevant_in_index=2)
     assert s["span_recall@1"] == 0.5
+
+
+def test_perfect_ranking_scores_one_when_a_chunk_covers_two_spans():
+    from evals.eval_retrieval import count_relevant_chunks
+    c = chunk("a.txt", 0, 1500)
+    golds = [{"file_path": "a.txt", "span": [100, 200]}, {"file_path": "a.txt", "span": [900, 1000]}]
+    n = count_relevant_chunks({"snippets": golds}, {"a.txt": [c]})
+    assert n == 1
+    assert score_query([c], golds, n_relevant_in_index=n)["ndcg@10"] == pytest.approx(1.0)

@@ -20,7 +20,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from rag.chunking import split_with_offsets
 
 DATA_DIR = Path("data")
 CORPUS_DIR = DATA_DIR / "corpus"
@@ -90,45 +90,67 @@ def resolve_on_disk(file_path: str, lookup: dict[str, list[Path]]) -> Path | Non
     return matches[0] if len(matches) == 1 else None  # 0 or ambiguous -> missing
 
 
-def read_exact(path: Path) -> str:
-    # newline="" stops Python from turning "\r\n" into "\n" on read. The gold
-    # spans are character offsets into the ORIGINAL file, so even one dropped
-    # "\r" per line would shift every later offset.
-    with open(path, encoding="utf-8", newline="") as f:
+def read_document(path: Path) -> str:
+    # Plain open() turns "\r\n" into "\n", exactly as the benchmark's own code
+    # does when it computes the gold offsets (legalbenchrag/benchmark_types.py).
+    # Keeping "\r" (newline="") shifted every MAUD span: 15 MAUD files use
+    # "\r\n", so offsets counted with "\r" pointed at the wrong text.
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 # ---------------------------------------------------------------------------
 # 2. Chunk one document, keeping each chunk's exact position in the file
 # ---------------------------------------------------------------------------
-def chunk_document(file_path: str, text: str, splitter) -> list[dict]:
-    docs = splitter.create_documents([text])
-    chunks = []
-    prev_start = -1
+def check_full_coverage(file_path: str, text: str, chunks: list[dict]) -> None:
+    """Every non-whitespace character must belong to some chunk.
+    The splitter never drops text, so a gap means a chunk was misplaced."""
+    covered = 0
+    for c in sorted(chunks, key=lambda c: c["start"]):
+        if c["start"] > covered and text[covered:c["start"]].strip():
+            raise ValueError(f"Text at {covered}-{c['start']} of {file_path} is in no chunk")
+        covered = max(covered, c["end"])
+    if text[covered:].strip():
+        raise ValueError(f"Text after {covered} of {file_path} is in no chunk")
 
-    for d in docs:
-        start = d.metadata["start_index"]
-        end = start + len(d.page_content)
 
-        # Sanity checks. If either fails, the span-overlap eval in step 2
-        # would silently score the wrong text, so fail loudly here instead.
-        if text[start:end] != d.page_content:
-            raise ValueError(f"Offset mismatch in {file_path} at {start}")
-        if start <= prev_start:
-            raise ValueError(f"Non-increasing chunk start in {file_path} at {start}")
-        prev_start = start
-
-        chunks.append(
-            {
-                "id": f"{file_path}::{start}",   # stable, readable ID
-                "file_path": file_path,
-                "dataset": file_path.split("/")[0],
-                "start": start,
-                "end": end,
-                "text": d.page_content,
-            }
-        )
+def chunk_document(file_path: str, text: str, size: int, overlap: int) -> list[dict]:
+    chunks = [
+        {
+            "id": f"{file_path}::{start}",   # stable, readable ID
+            "file_path": file_path,
+            "dataset": file_path.split("/")[0],
+            "start": start,
+            "end": end,
+            "text": text[start:end],
+        }
+        for start, end in split_with_offsets(text, size, overlap)
+    ]
+    check_full_coverage(file_path, text, chunks)
     return chunks
+
+
+def gold_alignment_report(queries: list[dict], texts: dict[str, str]) -> None:
+    """Share of gold spans that start or end in the middle of a word, per dataset.
+
+    Expert answers start and end on word boundaries. If many spans cut words
+    in half, the offsets don't match the text we read (this is how the
+    "\r\n" bug in MAUD showed up: 159 of 258 spans started mid-word).
+    """
+    cut = Counter()
+    total = Counter()
+    for q in queries:
+        for s in q["snippets"]:
+            text = texts[s["file_path"]]
+            a, b = s["span"]
+            mid_start = 0 < a < len(text) and text[a - 1].isalnum() and text[a].isalnum()
+            mid_end = 0 < b < len(text) and text[b - 1].isalnum() and text[b].isalnum()
+            total[q["dataset"]] += 1
+            cut[q["dataset"]] += mid_start or mid_end
+    for ds in sorted(total):
+        share = cut[ds] / total[ds]
+        flag = "   <-- WARNING: offsets probably don't match the text" if share > 0.05 else ""
+        print(f"gold spans cutting a word, {ds}: {cut[ds]}/{total[ds]} ({share:.1%}){flag}")
 
 
 def gold_span_coverage(queries: list[dict], chunks: list[dict]) -> float:
@@ -175,16 +197,11 @@ def main() -> None:
             print(f"   - {fp}")
 
     # --- chunking ---
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=args.chunk_size,
-        chunk_overlap=args.chunk_overlap,
-        add_start_index=True,  # records where each chunk starts in the file
-    )
-    chunks, total_chars = [], 0
+    chunks, texts = [], {}
     for fp in needed_files:
-        text = read_exact(disk_path[fp])
-        total_chars += len(text)
-        chunks.extend(chunk_document(fp, text, splitter))
+        texts[fp] = read_document(disk_path[fp])
+        chunks.extend(chunk_document(fp, texts[fp], args.chunk_size, args.chunk_overlap))
+    total_chars = sum(len(t) for t in texts.values())
 
     # --- write outputs ---
     CHUNKS_OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -202,6 +219,7 @@ def main() -> None:
     print(f"chunks:    {len(chunks)}  {dict(Counter(c['dataset'] for c in chunks))}")
     print(f"avg chunk: {sum(len(c['text']) for c in chunks) / len(chunks):.0f} chars")
     print(f"gold spans fully inside one chunk: {gold_span_coverage(queries, chunks):.1%}")
+    gold_alignment_report(queries, texts)
 
 
 if __name__ == "__main__":

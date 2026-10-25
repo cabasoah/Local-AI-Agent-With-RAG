@@ -4,9 +4,6 @@ Did the retriever fail to find the right DOCUMENT, or the right SECTION of it?
 Reads the per-query results that eval_retrieval.py saved, so it needs no
 Ollama and runs in about a second.
 
-Usage:
-    python -m evals.analyze_failures                 # uses evals/results/dense.jsonl
-    python -m evals.analyze_failures --name dense_prefix --examples maud
 """
 
 import argparse

@@ -5,14 +5,6 @@ The ground truth is character spans in documents, not chunk IDs. So a retrieved
 chunk counts as relevant when it comes from the same file as a gold span and
 its [start, end) range overlaps that span.
 
-Usage:
-    python -m evals.eval_retrieval                       # dense baseline, all queries
-    python -m evals.eval_retrieval --limit 10            # quick smoke test (10 per dataset)
-    python -m evals.eval_retrieval --name dense_prefix --query-prefix mxbai
-
-Outputs:
-    evals/results/<name>.jsonl         per-query scores + retrieved chunk IDs
-    evals/results/<name>.summary.json  averaged metrics, overall and per dataset
 """
 
 import argparse
@@ -143,12 +135,15 @@ def index_chunks_by_file(chunks: list[dict]) -> dict[str, list[dict]]:
 
 
 def count_relevant_chunks(query: dict, by_file: dict) -> int:
-    return sum(
-        1
+    # Count each chunk ONCE, even if it overlaps two gold spans. The actual
+    # ranking counts a chunk once, so the ideal ranking must too; counting
+    # (span, chunk) pairs made a perfect ranking score below 1.0.
+    return len({
+        c["id"]
         for g in query["snippets"]
         for c in by_file.get(g["file_path"], [])
         if chunk_hits_span(c, g)
-    )
+    })
 
 
 def coverage_report(queries: list[dict], by_file: dict) -> None:

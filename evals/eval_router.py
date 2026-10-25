@@ -8,10 +8,6 @@ Part 2 - full pipeline (real router, no answer key):
                        (a safety net: costs precision when the router was right,
                        saves the query when it was wrong)
 
-Usage:
-    python -m evals.eval_router                    # router accuracy + both pipelines
-    python -m evals.eval_router --router-only      # just part 1, takes ~1 second
-    python -m evals.eval_router --card-chars 4000  # try a bigger document card
 """
 
 import argparse

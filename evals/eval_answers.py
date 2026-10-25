@@ -17,10 +17,6 @@ the model DID with it. Two kinds of check:
 Questions are a random sample, fixed by --seed, so the same set comes back on
 every run. The default (10 per dataset) keeps hand-grading to ~40 answers.
 
-Usage:
-    python -m evals.eval_answers                        # 40 questions, ~10-30 min on CPU
-    python -m evals.eval_answers --per-dataset 3        # quick smoke test
-    python -m evals.eval_answers --summarize evals/grading_sheet.csv
 """
 
 import argparse
@@ -35,7 +31,7 @@ from pathlib import Path
 from rag.answer import OllamaGenerator, answer_question
 from evals.eval_retrieval import CHUNKS_PATH, QUERIES_PATH, RESULTS_DIR, chunk_hits_span, load_jsonl
 from rag.hybrid import HybridRetriever
-from rag.ingest import build_disk_lookup, read_exact, resolve_on_disk
+from rag.ingest import build_disk_lookup, read_document, resolve_on_disk
 from rag.router import DocumentRouter, split_query
 
 SHEET_PATH = Path("evals/grading_sheet.csv")
@@ -76,6 +72,17 @@ def report(rows: list[dict]) -> None:
               f"{statistics.median(r['gen_ms'] for r in rs) / 1000:.1f} |")
 
 
+def load_old_grades(path: Path) -> dict[str, dict]:
+    """Grades from an earlier sheet, keyed by question id."""
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return {r["id"]: r for r in csv.DictReader(f)}
+
+
+def same_text(a: str, b: str) -> bool:
+    # Excel can change line endings and spacing when it saves a CSV.
+    return " ".join(str(a).split()) == " ".join(str(b).split())
+
+
 def summarize_grades(path: Path) -> None:
     with open(path, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
@@ -96,10 +103,12 @@ def summarize_grades(path: Path) -> None:
         print(f"| {ds} | {n} | {c['y']} | {c['p']} | {c['n']} | {c['y'] / n:.2f} |")
 
     # Was a wrong answer the retriever's fault or the model's?
-    cross = Counter((r["retrieval_hit"], r["grade"].strip().lower()) for r in graded)
+    # Excel rewrites True/False as TRUE/FALSE when the sheet is saved, so normalize.
+    as_bool = lambda v: str(v).strip().lower() in {"true", "1", "yes"}
+    cross = Counter((as_bool(r["retrieval_hit"]), r["grade"].strip().lower()) for r in graded)
     print("\nWrong or partly-right answers, by whether retrieval found the answer:")
-    print(f"  retrieval HAD the answer:   {cross[('True', 'n')]} wrong, {cross[('True', 'p')]} partly  -> generation problem")
-    print(f"  retrieval MISSED the answer: {cross[('False', 'n')]} wrong, {cross[('False', 'p')]} partly  -> retrieval problem")
+    print(f"  retrieval HAD the answer:   {cross[(True, 'n')]} wrong, {cross[(True, 'p')]} partly  -> generation problem")
+    print(f"  retrieval MISSED the answer: {cross[(False, 'n')]} wrong, {cross[(False, 'p')]} partly  -> retrieval problem")
 
 
 def main(argv=None, store=None, generate=None) -> None:
@@ -111,6 +120,9 @@ def main(argv=None, store=None, generate=None) -> None:
     p.add_argument("--sheet", type=Path, default=SHEET_PATH)
     p.add_argument("--overwrite", action="store_true", help="replace an existing grading sheet")
     p.add_argument("--summarize", type=Path, metavar="SHEET", help="report on a graded sheet, then exit")
+    p.add_argument("--carry-grades", type=Path, metavar="OLD_SHEET",
+                   help="copy grades from an older sheet for rows whose question, expert answer "
+                        "and model answer are all unchanged; everything else is left to regrade")
     args = p.parse_args(argv)
 
     if args.summarize:
@@ -137,7 +149,7 @@ def main(argv=None, store=None, generate=None) -> None:
         for s in q["snippets"]:
             fp = s["file_path"]
             if fp not in doc_cache:
-                doc_cache[fp] = read_exact(resolve_on_disk(fp, lookup))
+                doc_cache[fp] = read_document(resolve_on_disk(fp, lookup))
             parts.append(doc_cache[fp][s["span"][0]:s["span"][1]].strip())
         return " ... ".join(parts)
 
@@ -178,11 +190,27 @@ def main(argv=None, store=None, generate=None) -> None:
         w = csv.writer(f)
         w.writerow(["id", "dataset", "question", "expert_answer", "model_answer",
                     "retrieval_hit", "citation_hit", "grade", "notes"])
+        old = load_old_grades(args.carry_grades) if args.carry_grades else {}
+        carried, to_grade = 0, []
         for r in rows:
-            w.writerow([r["id"], r["dataset"], r["question"], r["gold"][:1500], r["answer"],
-                        r["retrieval_hit"], r["citation_hit"], "", ""])
+            grade, notes = "", ""
+            prev = old.get(r["id"])
+            # A grade only carries over if the grader saw exactly what is shown now.
+            if prev and all(same_text(prev[k], v) for k, v in
+                            [("question", r["question"]), ("expert_answer", r["gold"]),
+                             ("model_answer", r["answer"])]):
+                grade, notes = prev["grade"], prev["notes"]
+                carried += 1
+            else:
+                to_grade.append(r["id"])
+            # Full expert answer: cutting it short meant graders could miss part of it.
+            w.writerow([r["id"], r["dataset"], r["question"], r["gold"], r["answer"],
+                        r["retrieval_hit"], r["citation_hit"], grade, notes])
 
     report(rows)
+    if args.carry_grades:
+        print(f"\nCarried over {carried} grades unchanged. Grade these {len(to_grade)} rows: "
+              f"{', '.join(to_grade)}")
     print(f"\nSaved {out} and {args.sheet}")
     print("Fill the `grade` column with y / p / n, then: "
           f"python -m evals.eval_answers --summarize {args.sheet}")
