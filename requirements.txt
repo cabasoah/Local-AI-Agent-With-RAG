@@ -3,5 +3,5 @@ langchain-ollama
 langchain-chroma
 langchain-text-splitters
 rank-bm25
-sentence-transformers  # only for evals/eval_rerank.py
+# sentence-transformers  # only for evals/eval_rerank.py
 pytest

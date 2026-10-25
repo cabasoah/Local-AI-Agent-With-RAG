@@ -4,10 +4,6 @@ Step 4: compare dense, BM25 and hybrid search inside the routed contract.
 All three use the same router (step 3) and the same 743 questions, in one
 session, so the latency numbers are comparable too.
 
-Usage:
-    python -m evals.eval_hybrid                     # all three modes
-    python -m evals.eval_hybrid --modes bm25        # BM25 only: no Ollama needed, ~seconds
-    python -m evals.eval_hybrid --limit 10          # quick smoke test, 10 questions per dataset
 """
 
 import argparse

@@ -8,12 +8,6 @@ Three parts:
      candidates? A reranker can only reorder what it's given, so this is its ceiling.
   C. Rerank the top N candidates with the cross-encoder and score the top 10.
 
-Usage:
-    pip install sentence-transformers
-    python -m evals.eval_rerank --limit 10            # smoke test: 40 questions
-    python -m evals.eval_rerank                       # pool of 20 (default)
-    python -m evals.eval_rerank --pools 20 50         # compare pool sizes
-    python -m evals.eval_rerank --model BAAI/bge-reranker-base
 """
 
 import argparse

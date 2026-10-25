@@ -16,7 +16,7 @@ from collections import defaultdict
 
 from evals.eval_retrieval import QUERIES_PATH, load_jsonl
 from rag.hybrid import tokenize
-from rag.ingest import build_disk_lookup, read_exact, resolve_on_disk
+from rag.ingest import build_disk_lookup, read_document, resolve_on_disk
 from rag.router import split_query
 
 
@@ -30,7 +30,7 @@ def main(argv=None) -> None:
 
     def doc_text(fp: str) -> str:
         if fp not in texts:
-            texts[fp] = read_exact(resolve_on_disk(fp, lookup))
+            texts[fp] = read_document(resolve_on_disk(fp, lookup))
         return texts[fp]
 
     overlap = defaultdict(list)
