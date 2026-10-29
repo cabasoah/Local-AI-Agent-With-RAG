@@ -67,6 +67,7 @@ python -m evals.eval_hybrid   # reproduce the retrieval results
 - Put it behind an API with a live demo.
 - Decide NOT FOUND from retrieval scores instead of asking the model.
 - Try a larger model (e.g. llama3.1:8b).
+- Build an agent on top
 
 ## How this was built
 
